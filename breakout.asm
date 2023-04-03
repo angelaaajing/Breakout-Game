@@ -27,11 +27,13 @@ brick_y:		.word 	4,4,4,4,6,6,6,8,8,8,8,10,10,10,12,12,12,12
 ##############################################################################
 life:			.word	3
 ball_x:			.word	32
-ball_y:			.word	28
+ball_y:			.word	25
 vdirection:		.word	-1
 hdirection:		.word	0
 paddle_x:		.word	30
-paddle_y:		.word	29
+paddle_y:		.word	26
+paddle2_x:		.word	30
+paddle2_y:		.word	29
 ##############################################################################
 # Code
 ##############################################################################
@@ -44,7 +46,21 @@ main:
     	lw $t0, ADDR_DSPL		# $t0 stores the base address for display
     	li $t4, 0x808080		# $t4 stores colour grey
 	jal draw_wall			# call draw_wall function
-	
+	# Draw first paddle
+	la $t6, paddle_x		# $t6 has the address of paddle_x
+	addi $sp, $sp, -4		# move $sp to the next available location.
+	sw $t6, 0($sp)			# push $t6 onto the stack
+	la $t7, paddle_y		# $t7 has the address of paddle_y
+	addi $sp, $sp, -4		# move $sp to the next available location.
+	sw $t7, 0($sp)			# push $t6 onto the stack
+	jal draw_paddle			# call draw_paddle function
+	# Draw second paddle
+	la $t6, paddle2_x		# $t6 has the address of paddle2_x
+	addi $sp, $sp, -4		# move $sp to the next available location.
+	sw $t6, 0($sp)			# push $t6 onto the stack
+	la $t7, paddle2_y		# $t7 has the address of paddle2_y
+	addi $sp, $sp, -4		# move $sp to the next available location.
+	sw $t7, 0($sp)			# push $t6 onto the stack
 	jal draw_paddle			# call draw_paddle function
 	
 	jal draw_ball			# call draw_ball function
@@ -86,15 +102,18 @@ draw_ball:
 
 draw_paddle:
 	lw $t0, ADDR_DSPL		# $t0 stores the base address for display
+	lw $t7, 0($sp)			# Pop y location of the paddle from the stack
+	addi $sp, $sp, 4		# Move $sp to the top of the stack
+	lw $t6, 0($sp)			# Pop x location of the paddle from the stack
+	addi $sp, $sp, 4		# Move $sp to the top of the stack
+	
 	# Save any register values we'll need after calling draw_paddle ($ra)
 	addi $sp, $sp, -4		# move $sp to the next available location.
 	sw $ra, 0($sp)			# push $ra onto the stack.
 	
-	la $t6, paddle_x		# $t6 has the address of paddle_x
 	lw $t9, 0($t6)			# Fetch x position of the paddle
 	sll $t9, $t9, 2			# Multiply $t9 by 4
 	add $t0, $t0, $t9		# Add x offset to $t0
-	la $t7, paddle_y		# $t7 has the address of paddle_y
 	lw $t9, 0($t7)			# Fetch y position of the paddle
 	sll $t9, $t9, 8			# Multiply $t9 by 256
 	add $t0, $t0, $t9		# Add y offset to $t0
@@ -233,11 +252,53 @@ keyboard_input:
     	beq $a0, 0x71, respond_to_Q     # Check if the key q was pressed
 	beq $a0, 0x61, move_left	# Check if the key a was pressed
 	beq $a0, 0x64, move_right       # Check if the key d was pressed
+	beq $a0, 0x6A, move_left2	# Check if the key j was pressed
+	beq $a0, 0x6C, move_right2      # Check if the key l was pressed
 	beq $a0, 0x70, pause	        # Check if the key p was pressed
 	beq $a0, 0x72, reset	        # Check if the key r was pressed
 	b check_collision		# No valid key pressed, jump to check collision
 
 	# Update the paddle
+move_right2:
+	# $t2 = the paddle address
+    	la $t6, paddle2_x		# $t6 has the address of paddle_x
+	lw $t8, 0($t6)			# Fetch x position of the paddle
+	add $t9, $zero, 57		# The right bound of the paddle
+	beq $t8, $t9, check_collision   # Check if the paddle already reached the right bound. If so, do nothing.
+	addi $t8, $t8, 1		# If not, update the location of the paddle
+	sw $t8, 0($t6)
+	sll $t8, $t8, 2			# Multiply $t8 by 4
+	la $t7, paddle2_y		# $t7 has the address of paddle_y
+	lw $t9, 0($t7)			# Fetch y position of the paddle
+	sll $t9, $t9, 8 		# Multiply $t9 by 256
+	add $t2, $t1, $t8		# Add x offset to $t2
+	add $t2, $t2, $t9		# Add y offset to $t2
+	li $t8, 0xffffff		# $t8 stores colour white
+	li $t9, 0x000000		# $t9 stores colour black
+	sw $t9, -4($t2)			# Change the colour of the first unit of the paddle to be black
+	sw $t8, 16($t2)			# Change the colour of the last unit of the paddle to be white
+	b check_collision		# Jump to check collision
+
+move_left2:
+	# $t2 = the paddle address
+    	la $t6, paddle2_x		# $t6 has the address of paddle_x
+	lw $t8, 0($t6)			# Fetch x position of the paddle
+	add $t9, $zero, 2		# The left bound of the paddle
+	beq $t8, $t9, check_collision   # Check if the paddle already reached the left bound. If so, do nothing.
+	addi $t8, $t8, -1		# If not, update the location of the paddle
+	sw $t8, 0($t6)
+	sll $t8, $t8, 2			# Multiply $t8 by 4
+	la $t7, paddle2_y		# $t7 has the address of paddle_y
+	lw $t9, 0($t7)			# Fetch y position of the paddle
+	sll $t9, $t9, 8			# Multiply $t9 by 256
+	add $t2, $t1, $t8		# Add x offset to $t2
+	add $t2, $t2, $t9		# Add y offset to $t2
+	li $t8, 0xffffff		# $t8 stores colour white
+	li $t9, 0x000000		# $t9 stores colour black
+	sw $t8, 0($t2)			# Change the colour of the first unit of the paddle to be white
+	sw $t9, 20($t2)			# Change the colour of the last unit of the paddle to be black
+	b check_collision		# Jump to check collision
+
 move_right:
 	# $t2 = the paddle address
     	la $t6, paddle_x		# $t6 has the address of paddle_x
@@ -284,6 +345,7 @@ move_left:
 # $t3 = the new ball address
 #######################################
 check_collision:
+	# Find current address of the ball
 	la $t6, ball_x			# $t6 has the address of ball_x
 	lw $t8, 0($t6)			# Fetch x position of the ball
 	sll $t8, $t8, 2			# Multiply $t8 by 4
@@ -294,7 +356,7 @@ check_collision:
 	add $t2, $t2, $t9		# Add y offset to $t2
 	addi $sp, $sp, -4		# move $sp to the next available location.
 	sw $t2, 0($sp)			# Push the original position of the ball to the stack
-	
+	# Find next address of the ball
 	la $t4, hdirection		# $t4 has the address of horizontal direction
 	lw $t8, 0($t4)			# Fetch horizontal direction of movement
 	addi $t9, $zero, 4		# Figure out the position movement in horizontal direction
@@ -307,27 +369,71 @@ check_collision:
 	mult $t8, $t9
 	mflo $t8			# get the result of multipication
 	add $t3, $t8, $t3		# update the position for the horizontal movement
-	
-	# check the next position of the ball
+	# check if the next position of the ball doesn't hit anything
 	li $t4, 0x000000		# $t4 stores colour black
 	lw $t5, 0($t3)			# load the colour at $t3
 	beq $t4, $t5, update_ball	# If no collision occurs, update the position of the ball
-	
 	# If collision occurs, check which side the ball hits, then update direction.
 	lw $t5, 4($t3)			# load the colour at 4($t3)
-	beq $t4, $t5, hit_right_side
+	beq $t4, $t5, hit_right_side	# check if the ball hits the right side
 	lw $t5, -4($t3)			# load the colour at -4($t3)
-	beq $t4, $t5, hit_left_side
+	beq $t4, $t5, hit_left_side	# check if the ball hits the left side
+	# Check special case when hitting the paddle
+	li $t4, 0xffffff		# $t4 stores colour white
+	lw $t5, 0($t3)			# load the colour at -8($t3)
+	beq $t4, $t5, check_spec_paddle # Check if the ball hits the paddle
+	# Otherwise, do regular collision: horizontal direction changes to 0 and change vertical direction
 	la $t8, hdirection		# $t8 has the address of horizontal direction
 	add $t9, $zero, $zero		# set to be zero
 	sw $t9, 0($t8)			# Store new hdirection
 	j change_vdirection
 	
-change_vdirection:    # the regular hit, update the vdirection
+check_spec_paddle:
+	li $t4, 0x000000		# $t4 stores colour black
+	lw $t5, -8($t3)			# load the colour at 8($t3)	
+	beq $t4, $t5, hit_left_2  	# Check if the ball hits the second unit of the paddle
+	lw $t5, 8($t3)			# load the colour at 8($t3)
+	beq $t4, $t5, hit_right_2 	# Check if the ball hits the second last unit of the paddle
+	# Otherwise, do regular collision: horizontal direction changes to 0 and change vertical direction
+	la $t8, hdirection		# $t8 has the address of horizontal direction
+	add $t9, $zero, $zero		# set to be zero
+	sw $t9, 0($t8)			# Store new hdirection
+	j change_vdirection
+	
+hit_left_2:	# Change direction to be (-1,2) or (-1,-2)
+	la $t8, hdirection		# $t8 has the address of horizontal direction
+	lw $t9, 0($t8)			# Fetch horizontal direction of movement
+	addi $t9, $zero, -1		# change direction to move to left
+	sw $t9, 0($t8)			# Store new hdirection
 	la $t8, vdirection		# $t8 has the address of vertical direction
 	lw $t9, 0($t8)			# Fetch vertical direction of movement
-	xori $t9, -1			# Convert between 1 and -1, keep if 0
-	addi $t9, $t9, 1		# Get 2's complement
+	slt $t6, $zero, $t9  		# set $t6 to 1 if the number is negative, 0 otherwise
+    	slt $t7, $t9, $zero  		# set $t6 to 1 if the number is positive, 0 otherwise
+    	sub $t9, $t7, $t6  		# subtract $t6 from $t7 to get 1 if negative, -1 if positive, 0 if 0
+	sll $t9, $t9, 1			# multiply $t9 by 2
+	sw $t9, 0($t8)			# Store new vdirection
+	j update_ball			# next step
+	
+hit_right_2:	# Change direction to be (1,2) or (1,-2)
+	la $t8, hdirection		# $t8 has the address of horizontal direction
+	lw $t9, 0($t8)			# Fetch horizontal direction of movement
+	addi $t9, $zero, 1		# change direction to move to right
+	sw $t9, 0($t8)			# Store new hdirection
+	la $t8, vdirection		# $t8 has the address of vertical direction
+	lw $t9, 0($t8)			# Fetch vertical direction of movement
+	slt $t6, $zero, $t9  		# set $t6 to 1 if the number is negative, 0 otherwise
+    	slt $t7, $t9, $zero  		# set $t6 to 1 if the number is positive, 0 otherwise
+    	sub $t9, $t7, $t6  		# subtract $t6 from $t7 to get 1 if negative, -1 if positive, 0 if 0
+	sll $t9, $t9, 1			# multiply $t9 by 2
+	sw $t9, 0($t8)			# Store new vdirection
+	j update_ball			# next step
+	
+change_vdirection:    # update the vdirection
+	la $t8, vdirection		# $t8 has the address of vertical direction
+	lw $t9, 0($t8)			# Fetch vertical direction of movement
+	slt $t6, $zero, $t9  		# set $t6 to 1 if the number is negative, 0 otherwise
+    	slt $t7, $t9, $zero  		# set $t6 to 1 if the number is positive, 0 otherwise
+    	sub $t9, $t7, $t6  		# subtract $t6 from $t7 to get 1 if negative, -1 if positive, 0 if 0
 	sw $t9, 0($t8)			# Store new vdirection
 	
 	li $t4, 0xffffff		# $t4 stores colour white
@@ -340,7 +446,7 @@ change_vdirection:    # the regular hit, update the vdirection
 	# Hit a brick, brick broken
 	j redraw_brick
 	
-hit_right_side:
+hit_right_side:		# set horizontal direction to be 1
 	la $t8, hdirection		# $t8 has the address of horizontal direction
 	lw $t9, 0($t8)			# Fetch horizontal direction of movement
 	addi $t9, $zero, 1		# change direction to move to right
@@ -351,7 +457,7 @@ hit_right_side:
 	beq $t4, $t5, update_ball	# Hit a wall, update position of the ball
 	j change_vdirection
 	
-hit_left_side:
+hit_left_side:		# set horizontal direction to be -1
 	la $t8, hdirection		# $t8 has the address of horizontal direction
 	lw $t9, 0($t8)			# Fetch horizontal direction of movement
 	addi $t9, $zero, -1		# change direction to move to left
@@ -411,7 +517,7 @@ check_game_over:	# Check whether game over or not
 	addi $t6, $zero, 32		# Reset ball_x
 	sw $t6, 0($t7)
 	la $t7, ball_y			# $t7 has the address of ball_y
-	addi $t6, $zero, 28		# Reset ball_y
+	addi $t6, $zero, 25		# Reset ball_y
 	sw $t6, 0($t7)
 	la $t7, vdirection		# $t7 has the address of vdirection
 	addi $t6, $zero, -1		# Reset vdirection
@@ -420,7 +526,7 @@ check_game_over:	# Check whether game over or not
 	addi $t6, $zero, 0		# Reset hdirection
 	sw $t6, 0($t7)
 	j sleep
-	
+
 # Redraw the brick
 redraw_brick: 
 	lw $t6, 0($t3)			# load the colour at 0($t3)
@@ -450,7 +556,7 @@ left_side:
 	# 4. Sleep
 sleep:
 	li $v0, 32
-	li $a0, 100
+	li $a0, 10
 	syscall
 	
 	# 5. Back to step 1
@@ -480,13 +586,19 @@ loop:	sw $t2, 0($t0)			# colour black
 	addi $t6, $zero, 32		# Reset ball_x
 	sw $t6, 0($t7)
 	la $t7, ball_y			# $t7 has the address of ball_y
-	addi $t6, $zero, 28		# Reset ball_y
+	addi $t6, $zero, 25		# Reset ball_y
 	sw $t6, 0($t7)
 	la $t7, paddle_x		# $t7 has the address of paddle_x
 	addi $t6, $zero, 30		# Reset paddle_x
 	sw $t6, 0($t7)
 	la $t7, paddle_y		# $t7 has the address of paddle_y
-	addi $t6, $zero, 29		# Reset paddle_y
+	addi $t6, $zero, 26		# Reset paddle_y
+	sw $t6, 0($t7)
+	la $t7, paddle2_x		# $t7 has the address of paddle2_x
+	addi $t6, $zero, 30		# Reset paddle2_x
+	sw $t6, 0($t7)
+	la $t7, paddle2_y		# $t7 has the address of paddle2_y
+	addi $t6, $zero, 29		# Reset paddle2_y
 	sw $t6, 0($t7)
 	la $t7, vdirection		# $t7 has the address of vdirection
 	addi $t6, $zero, -1		# Reset vdirection
